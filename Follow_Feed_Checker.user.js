@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Follow Feed Checker
 // @namespace        http://tampermonkey.net/
-// @version        2.2
+// @version        2.3
 // @description        「フォローフィード」の管理補助ツール
 // @author        Ameba Blog User
 // @match        https://www.ameba.jp/home
@@ -30,13 +30,40 @@ if(path=='/home'){ // HOMEページで有効
     // setting[5] リスト更新直前の最下のリスト番号
     // setting[6] リスト更新直前のページスクロール量
 
-
-    let read_json=localStorage.getItem('followfeed_set'); // ローカルストレージ保存名
+    let read_json=localStorage.getItem('followfeed_set'); // ストレージ保存名
     setting=JSON.parse(read_json);
     if(setting==null || setting.length<7){
         setting=['FollowFeedSet',20,1,10,0,0,0]; }
     let write_json=JSON.stringify(setting);
-    localStorage.setItem('followfeed_set', write_json); // ローカルストレージ保存
+    localStorage.setItem('followfeed_set', write_json); // ストレージ保存
+
+
+
+    let ffDB={}; // 閲覧記事のID/チェックフラグの記録配列
+
+    let fread_json=localStorage.getItem('FFDB'); // レージ保存名
+    ffDB=JSON.parse(fread_json);
+    if(ffDB==null){
+        ffDB=[[0, 0]]; }
+    list_diet();
+    fwrite();
+
+    function list_diet(){
+        ffDB=ffDB.filter(function(value){
+            return value[1]>zone(4); }); } //🔴
+
+    function fwrite(){
+        let fwrite_json=JSON.stringify(ffDB);
+        localStorage.setItem('FFDB', fwrite_json); } // ストレージ保存
+
+    function zone(d){ // d日前のタイムスタンプ値を生成
+        let time=new Date();
+        time.setDate(time.getDate() - d);
+        let Y=time.getFullYear();
+        let M=time.getMonth()+1;
+        let D=time.getDate();
+        return 10000*Y + 100*M + D; }
+
 
 
 
@@ -138,6 +165,38 @@ if(path=='/home'){ // HOMEページで有効
             if(more_button){
                 more_button.addEventListener('mousedown', function(event){
                     last_item(); }); }
+
+
+
+            let hcal=document.querySelectorAll('.HomeChecklist_Article_Link');
+            for(let k=0; k<hcal.length; k++){
+                let user_href=hcal[k].getAttribute('href');
+                let ids=user_href.split('entry-')[1].substring(0, 11);
+                if(ids){
+                    let id=parseInt(ids);
+                    if(list_check(id)){
+                        hcal[k].classList.add('visit'); }}} // class名「visit」を追加
+
+            for(let k=0; k<hcal.length; k++){
+                hcal[k].onmouseup=()=>{
+                    hcal[k].classList.add('visit'); // class名「visit」を追加
+                    let href=hcal[k].getAttribute('href');
+                    let ids=href.split('entry-')[1].substring(0, 11);
+                    if(ids){
+                        let id=parseInt(ids);
+                        if(!list_check(id)){
+                            list_add(id);
+                            fwrite(); }}}}
+
+            function list_add(id){
+                ffDB.push([id, zone(0)]); }
+
+            function list_check(entry_id){
+                for(let k=0; k<ffDB.length; k++){
+                    if(ffDB[k][0]==entry_id){
+                        return true;
+                        break; }}}
+
 
 
             mode_select();
@@ -258,6 +317,7 @@ if(path=='/home'){ // HOMEページで有効
                 '<input id="ref_setter" type="number" value="10" min="1" max="30" step="1">'+
                 '<span> 分</span></div>'+
                 help_SVG+
+
                 '<style>#ff_panel { position: fixed; top: 8px; left: calc(50% - 532px); '+
                 'font: bold 16px/24px Meiryo; color: #666; background: #fff; '+
                 'width: auto; height: 30px; padding: 7px 60px 3px 20px; border: 1px solid #20d6c5; '+
@@ -270,6 +330,14 @@ if(path=='/home'){ // HOMEページで有効
                 '.ff_help { position: absolute; top: 9px; right: 12px; width: 24px; height: 24px; '+
                 'cursor: pointer; } '+
                 '.PcHeader_Logo img { outline: 1px solid #20d6c5; outline-offset: 3px; } '+
+
+                //「:visited」リンク色の補償スタイル
+                '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Meta::before { '+
+                'background-color: transparent; } '+
+                '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Unread { '+
+                'background-color: transparent; } '+
+                '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Title { '+
+                'color: #689cb5; } '+
                 '</style></div>';
 
             if(!document.querySelector('#ff_panel')){
@@ -453,5 +521,4 @@ if(path=='/ucs/top.do'){ // 管理トップ で実行
                 }, 1000); }}}
 
 } // 管理トップ で実行
-
 
