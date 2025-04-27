@@ -29,11 +29,12 @@ if(path=='/home'){ // HOMEページで有効
     // setting[4]
     // setting[5] リスト更新直前の最下のリスト番号
     // setting[6] リスト更新直前のページスクロール量
+    // setting[7] 既読管理の ON/OFF
 
     let read_json=localStorage.getItem('followfeed_set'); // ストレージ保存名
     setting=JSON.parse(read_json);
-    if(setting==null || setting.length<7){
-        setting=['FollowFeedSet',20,1,10,0,0,0]; }
+    if(setting==null || setting.length<8){
+        setting=['FollowFeedSet',20,1,10,0,0,0,1]; }
     let write_json=JSON.stringify(setting);
     localStorage.setItem('followfeed_set', write_json); // ストレージ保存
 
@@ -53,8 +54,9 @@ if(path=='/home'){ // HOMEページで有効
             return value[1]>zone(4); }); } //🔴
 
     function fwrite(){
-        let fwrite_json=JSON.stringify(ffDB);
-        localStorage.setItem('FFDB', fwrite_json); } // ストレージ保存
+        if(setting[7]==1){
+            let fwrite_json=JSON.stringify(ffDB);
+            localStorage.setItem('FFDB', fwrite_json); }} // ストレージ保存
 
     function zone(d){ // d日前のタイムスタンプ値を生成
         let time=new Date();
@@ -167,7 +169,17 @@ if(path=='/home'){ // HOMEページで有効
                     last_item(); }); }
 
 
+            if(setting[7]==1){
+                visit_control(); }
 
+            mode_select();
+            checker();
+
+        } // main()
+
+
+
+        function visit_control(){
             let hcal=document.querySelectorAll('.HomeChecklist_Article_Link');
             for(let k=0; k<hcal.length; k++){
                 let user_href=hcal[k].getAttribute('href');
@@ -197,12 +209,7 @@ if(path=='/home'){ // HOMEページで有効
                         return true;
                         break; }}}
 
-
-
-            mode_select();
-            checker();
-
-        } // main()
+        } // visit_control()
 
 
 
@@ -315,10 +322,9 @@ if(path=='/home'){ // HOMEページで有効
                 '<label><input id="ff_timer" type="checkbox"> タイマー更新</label>　'+
                 '<div id="ref_set"><span>更新間隔 </span>'+
                 '<input id="ref_setter" type="number" value="10" min="1" max="30" step="1">'+
-                '<span> 分</span></div>'+
-                '<span>　　既読データ：</span>'+
-                '<span id="mark_count"></span>'+
-                '<input id="ff_reset" type="submit" value="Reset">'+
+                '<span> 分　　</span></div>'+
+                '<label><input id="ff_visit" type="checkbox"> 既読マーク</label> '+
+                '<div id="visit_data"><span id="mark_count"></span>件</div>'+
                 help_SVG+
 
                 '<style>#ff_panel { position: fixed; top: 8px; left: calc(50% - 532px); '+
@@ -329,9 +335,9 @@ if(path=='/home'){ // HOMEページで有効
                 '#ff_close { padding: 3px 2px 1px; } '+
                 '#list_open, #ref_setter { width: 50px; height: 18px; padding: 4px 2px 1px; '+
                 'text-align: center; } '+
-                '#ref_set { display: inline-block; } '+
-                '#mark_count { display: inline-block; padding: 0 6px; } '+
-                '#ff_reset { margin-left: 6px; padding: 3px 6px 1px; } '+
+                '#ref_set, #visit_data, #mark_count { display: inline-block; } '+
+                '#mark_count { font-weight: normal; color: #000; margin: 0 6px; '+
+                'padding: 1px 6px 0; border: 1px solid #777; border-radius: 2px; } '+
                 '.ff_help { position: absolute; top: 9px; right: 12px; width: 24px; height: 24px; '+
                 'cursor: pointer; } '+
                 '.PcHeader_Logo img { outline: 1px solid #20d6c5; outline-offset: 3px; } '+
@@ -411,16 +417,32 @@ if(path=='/home'){ // HOMEページで有効
                         localStorage.setItem('followfeed_set', write_json); } // ストレージ保存
 
 
+                    let ff_visit=document.querySelector('#ff_visit');
+                    let visit_data=document.querySelector('#visit_data');
                     let mark_count=document.querySelector('#mark_count');
-                    if(mark_count){
-                        mark_count.textContent=ffDB.length;
+                    if(setting[7]==1){
+                        ff_visit.checked=true;
+                        visit_data.style.opacity=1;
+                        mark_count.textContent=ffDB.length; }
+                    else{
+                        ff_visit.checked=false;
+                        visit_data.style.opacity=0.5;
+                        mark_count.textContent='0'; }
 
-                        let ff_reset=document.querySelector('#ff_reset');
-                        if(ff_reset){
-                            ff_reset.onclick=()=>{
-                                ffDB=[[0, 0]];
-                                mark_count.textContent=ffDB.length;
-                                fwrite(); }}}
+                    ff_visit.onchange=()=>{
+                        if(ff_visit.checked){
+                            setting[7]=1;
+                            visit_data.style.opacity=1;
+                            ffDB=[[0, 0]];
+                            mark_count.textContent='0'; }
+                        else{
+                            setting[7]=0;
+                            visit_data.style.opacity=0.5;
+                            localStorage.removeItem ('FFDB');
+                            mark_count.textContent='0'; }
+
+                        let write_json=JSON.stringify(setting);
+                        localStorage.setItem('followfeed_set', write_json); } // ストレージ保存
 
 
                     let ff_help=document.querySelector('.ff_help');
