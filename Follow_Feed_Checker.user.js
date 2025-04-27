@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Follow Feed Checker
 // @namespace        http://tampermonkey.net/
-// @version        2.3
+// @version        2.4
 // @description        「フォローフィード」の管理補助ツール
 // @author        Ameba Blog User
 // @match        https://www.ameba.jp/home
@@ -41,7 +41,7 @@ if(path=='/home'){ // HOMEページで有効
 
     let ffDB={}; // 閲覧記事のID/チェックフラグの記録配列
 
-    let fread_json=localStorage.getItem('FFDB'); // レージ保存名
+    let fread_json=localStorage.getItem('FFDB'); // ストレージ保存名
     ffDB=JSON.parse(fread_json);
     if(ffDB==null){
         ffDB=[[0, 0]]; }
@@ -316,17 +316,22 @@ if(path=='/home'){ // HOMEページで有効
                 '<div id="ref_set"><span>更新間隔 </span>'+
                 '<input id="ref_setter" type="number" value="10" min="1" max="30" step="1">'+
                 '<span> 分</span></div>'+
+                '<span>　　既読データ：</span>'+
+                '<span id="mark_count"></span>'+
+                '<input id="ff_reset" type="submit" value="Reset">'+
                 help_SVG+
 
                 '<style>#ff_panel { position: fixed; top: 8px; left: calc(50% - 532px); '+
                 'font: bold 16px/24px Meiryo; color: #666; background: #fff; '+
-                'width: auto; height: 30px; padding: 7px 60px 3px 20px; border: 1px solid #20d6c5; '+
+                'width: auto; height: 30px; padding: 7px 60px 4px 20px; border: 1px solid #20d6c5; '+
                 'box-shadow: 4px 6px 8px rgb(0, 0, 0, .1); z-index: 10; display: none; } '+
                 '@media screen and (max-width: 1140px){ #ff_panel { left: 28px; }} '+
                 '#ff_close { padding: 3px 2px 1px; } '+
                 '#list_open, #ref_setter { width: 50px; height: 18px; padding: 4px 2px 1px; '+
                 'text-align: center; } '+
                 '#ref_set { display: inline-block; } '+
+                '#mark_count { display: inline-block; padding: 0 6px; } '+
+                '#ff_reset { margin-left: 6px; padding: 3px 6px 1px; } '+
                 '.ff_help { position: absolute; top: 9px; right: 12px; width: 24px; height: 24px; '+
                 'cursor: pointer; } '+
                 '.PcHeader_Logo img { outline: 1px solid #20d6c5; outline-offset: 3px; } '+
@@ -351,21 +356,24 @@ if(path=='/home'){ // HOMEページで有効
             let pc_logo=document.querySelector('h1.PcHeader_Logo');
             let ff_panel=document.querySelector('#ff_panel');
             if(pc_logo && ff_panel){
-                pc_logo.onclick=function(event){
+                pc_logo.onclick=(event)=>{
                     event.preventDefault();
                     ff_panel.style.display='block';
 
+
                     let ff_close=document.querySelector('#ff_close');
-                    ff_close.onclick=function(event){
+                    ff_close.onclick=(event)=>{
                         event.stopImmediatePropagation();
                         window.location.reload(); }
 
+
                     let list_open=document.querySelector('#list_open');
                     list_open.value=setting[1];
-                    list_open.onchange=function(){
+                    list_open.onchange=()=>{
                         setting[1]=parseFloat(list_open.value);
                         let write_json=JSON.stringify(setting);
                         localStorage.setItem('followfeed_set', write_json); } // ストレージ保存
+
 
                     let ff_timer=document.querySelector('#ff_timer');
                     let ref_set=document.querySelector('#ref_set');
@@ -378,7 +386,8 @@ if(path=='/home'){ // HOMEページで有効
                         ff_timer.checked=false;
                         ref_set.style.opacity=0.5;
                         ref_setter.disabled=true; }
-                    ff_timer.onchange=function(){
+
+                    ff_timer.onchange=()=>{
                         if(ff_timer.checked){
                             setting[2]=1;
                             ref_set.style.opacity=1;
@@ -390,15 +399,29 @@ if(path=='/home'){ // HOMEページで有効
                         let write_json=JSON.stringify(setting);
                         localStorage.setItem('followfeed_set', write_json); } // ストレージ保存
 
+
                     ref_setter=document.querySelector('#ref_setter');
                     ref_setter.value=setting[3];
-                    ref_setter.onchange=function(){
+                    ref_setter.onchange=()=>{
                         if(parseFloat(ref_setter.value)>=0.1){
                             setting[3]=parseFloat(ref_setter.value); }
                         else{
                             setting[3]=1; }
                         let write_json=JSON.stringify(setting);
                         localStorage.setItem('followfeed_set', write_json); } // ストレージ保存
+
+
+                    let mark_count=document.querySelector('#mark_count');
+                    if(mark_count){
+                        mark_count.textContent=ffDB.length;
+
+                        let ff_reset=document.querySelector('#ff_reset');
+                        if(ff_reset){
+                            ff_reset.onclick=()=>{
+                                ffDB=[[0, 0]];
+                                mark_count.textContent=ffDB.length;
+                                fwrite(); }}}
+
 
                     let ff_help=document.querySelector('.ff_help');
                     if(ff_help){
@@ -521,4 +544,3 @@ if(path=='/ucs/top.do'){ // 管理トップ で実行
                 }, 1000); }}}
 
 } // 管理トップ で実行
-
