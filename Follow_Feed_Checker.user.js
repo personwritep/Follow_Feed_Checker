@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Follow Feed Checker
 // @namespace        http://tampermonkey.net/
-// @version        2.4
+// @version        2.5
 // @description        「フォローフィード」の管理補助ツール
 // @author        Ameba Blog User
 // @match        https://www.ameba.jp/home
@@ -40,13 +40,14 @@ if(path=='/home'){ // HOMEページで有効
 
 
 
-    let ffDB={}; // 閲覧記事のID/チェックフラグの記録配列
+    let ffDB=[]; // 閲覧記事のID/チェックフラグの記録配列
 
     let fread_json=localStorage.getItem('FFDB'); // ストレージ保存名
     ffDB=JSON.parse(fread_json);
     if(ffDB==null){
         ffDB=[[0, 0]]; }
-    list_diet();
+    if(ffDB.length>1){
+        list_diet(); }
     fwrite();
 
     function list_diet(){
@@ -186,28 +187,69 @@ if(path=='/home'){ // HOMEページで有効
                 let ids=user_href.split('entry-')[1].substring(0, 11);
                 if(ids){
                     let id=parseInt(ids);
-                    if(list_check(id)){
-                        hcal[k].classList.add('visit'); }}} // class名「visit」を追加
+                    if(list_check(id)==1){
+                        hcal[k].classList.add('visit'); // class「visit」を追加
+                        hcal[k].classList.remove('vmark'); } // class「vmark」を削除
+                    if(list_check(id)==2){
+                        hcal[k].classList.add('visit'); // class「visit」を追加
+                        hcal[k].classList.add('vmark'); }}} // class「visit」を追加
+
 
             for(let k=0; k<hcal.length; k++){
-                hcal[k].onmouseup=()=>{
-                    hcal[k].classList.add('visit'); // class名「visit」を追加
+                hcal[k].onmouseup=(event)=>{
                     let href=hcal[k].getAttribute('href');
                     let ids=href.split('entry-')[1].substring(0, 11);
                     if(ids){
                         let id=parseInt(ids);
-                        if(!list_check(id)){
-                            list_add(id);
-                            fwrite(); }}}}
+                        if(list_check(id)!=1 && list_check(id)!=2){
+                            if(event.button==2){
+                                hcal[k].classList.add('visit'); // class「visit」を追加
+                                hcal[k].classList.add('vmark'); // class「vmark」を追加
+                                list_add_mark(id); // id と mark の記録
+                                fwrite(); }
+                            else{
+                                hcal[k].classList.add('visit'); // class「visit」を追加
+                                list_add(id); // id の記録
+                                fwrite(); }}
+                        else{
+                            if(event.button==2){
+                                hcal[k].classList.toggle('vmark'); // class「vmark」を変更
+                                list_add_toggle(id); // markフラグの変更
+                                fwrite(); }}}}}
+
+
+            for(let k=0; k<hcal.length; k++){
+                hcal[k].oncontextmenu=(event)=>{
+                    event.preventDefault(); }}
+
 
             function list_add(id){
                 ffDB.push([id, zone(0)]); }
 
+            function list_add_mark(id){
+                ffDB.push([id, zone(0), 1]); }
+
+            function list_add_toggle(id){
+                for(let k=0; k<ffDB.length; k++){
+                    if(ffDB[k][0]==id){ // id の登録内容を変更
+                        if(ffDB[k].length==3){ // mark あり
+                            ffDB[k]=[id, zone(0)]; // markフラグ削除
+                            fwrite();
+                            break; }
+                        else{ // mark なし
+                            ffDB[k]=[id, zone(0), 1]; // markフラグ追加
+                            fwrite();
+                            break; }}}}
+
             function list_check(entry_id){
                 for(let k=0; k<ffDB.length; k++){
-                    if(ffDB[k][0]==entry_id){
-                        return true;
-                        break; }}}
+                    if(ffDB[k][0]==entry_id){ // id 該当
+                        if(ffDB[k].length==3){ // mark あり
+                            return 2;
+                            break; }
+                        else{ // mark なし
+                            return 1;
+                            break; }}}}
 
         } // visit_control()
 
@@ -347,6 +389,10 @@ if(path=='/home'){ // HOMEページで有効
                 'background-color: transparent; } '+
                 '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Unread { '+
                 'background-color: transparent; } '+
+                '.HomeChecklist_Article_Link.vmark .HomeChecklist_Article_Meta::before { '+
+                'background-color: #2196f3 !important; } '+
+                '.HomeChecklist_Article_Link.vmark .HomeChecklist_Article_Unread { '+
+                'background-color: #2196f3 !important; } '+
                 '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Title { '+
                 'color: #689cb5; } '+
                 '</style></div>';
@@ -434,6 +480,7 @@ if(path=='/home'){ // HOMEページで有効
                             setting[7]=1;
                             visit_data.style.opacity=1;
                             ffDB=[[0, 0]];
+                            fwrite();
                             mark_count.textContent='0'; }
                         else{
                             setting[7]=0;
