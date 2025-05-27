@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Follow Feed Checker
 // @namespace        http://tampermonkey.net/
-// @version        2.5
+// @version        2.6
 // @description        「フォローフィード」の管理補助ツール
 // @author        Ameba Blog User
 // @match        https://www.ameba.jp/home
@@ -377,6 +377,8 @@ if(path=='/home'){ // HOMEページで有効
                 '#ff_close { padding: 3px 2px 1px; } '+
                 '#list_open, #ref_setter { width: 50px; height: 18px; padding: 4px 2px 1px; '+
                 'text-align: center; } '+
+                '#list_open::-webkit-inner-spin-button, #ref_setter::-webkit-inner-spin-button { '+
+                'height: 17px; } '+
                 '#ref_set, #visit_data, #mark_count { display: inline-block; } '+
                 '#mark_count { font-weight: normal; color: #000; margin: 0 6px; '+
                 'padding: 1px 6px 0; border: 1px solid #777; border-radius: 2px; } '+
