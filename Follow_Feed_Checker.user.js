@@ -370,7 +370,7 @@ if(path=='/home'){ // HOMEページで有効
                 help_SVG+
 
                 '<style>#ff_panel { position: fixed; top: 8px; left: calc(50% - 532px); '+
-                'font: bold 16px/24px Meiryo; color: #666; background: #fff; '+
+                'font: bold 16px/24px Meiryo; color: #666; background: #fff; white-space: nowrap; '+
                 'width: auto; height: 30px; padding: 7px 60px 4px 20px; border: 1px solid #20d6c5; '+
                 'box-shadow: 4px 6px 8px rgb(0, 0, 0, .1); z-index: 10; display: none; } '+
                 '@media screen and (max-width: 1140px){ #ff_panel { left: 28px; }} '+
