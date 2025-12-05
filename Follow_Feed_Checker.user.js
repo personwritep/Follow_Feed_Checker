@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Follow Feed Checker
 // @namespace        http://tampermonkey.net/
-// @version        2.6
+// @version        2.7
 // @description        「フォローフィード」の管理補助ツール
 // @author        Ameba Blog User
 // @match        https://www.ameba.jp/home
@@ -29,7 +29,7 @@ if(path=='/home'){ // HOMEページで有効
     // setting[4]
     // setting[5] リスト更新直前の最下のリスト番号
     // setting[6] リスト更新直前のページスクロール量
-    // setting[7] 既読管理の ON/OFF
+    // setting[7] マーク管理の ON/OFF
 
     let read_json=localStorage.getItem('followfeed_set'); // ストレージ保存名
     setting=JSON.parse(read_json);
@@ -169,9 +169,11 @@ if(path=='/home'){ // HOMEページで有効
                 more_button.addEventListener('mousedown', function(event){
                     last_item(); }); }
 
-
             if(setting[7]==1){
+                set_mark(1);
                 visit_control(); }
+            else{
+                set_mark(0); }
 
             mode_select();
             checker();
@@ -187,69 +189,49 @@ if(path=='/home'){ // HOMEページで有効
                 let ids=user_href.split('entry-')[1].substring(0, 11);
                 if(ids){
                     let id=parseInt(ids);
-                    if(list_check(id)==1){
-                        hcal[k].classList.add('visit'); // class「visit」を追加
+                    if(list_check(id)==0){
                         hcal[k].classList.remove('vmark'); } // class「vmark」を削除
-                    if(list_check(id)==2){
-                        hcal[k].classList.add('visit'); // class「visit」を追加
-                        hcal[k].classList.add('vmark'); }}} // class「visit」を追加
+                    if(list_check(id)==1){
+                        hcal[k].classList.add('vmark'); }}} // class「vmark」を追加
 
+
+            let meta=document.querySelectorAll('.HomeChecklist_Article_Link');
 
             for(let k=0; k<hcal.length; k++){
-                hcal[k].onmouseup=(event)=>{
-                    let href=hcal[k].getAttribute('href');
-                    let ids=href.split('entry-')[1].substring(0, 11);
-                    if(ids){
-                        let id=parseInt(ids);
-                        if(list_check(id)!=1 && list_check(id)!=2){
-                            if(event.button==2){
-                                hcal[k].classList.add('visit'); // class「visit」を追加
+                let meta=hcal[k].querySelector('.HomeChecklist_Article_Meta');
+                if(meta){
+                    meta.addEventListener('click', function(event){
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+
+                        let href=hcal[k].getAttribute('href');
+                        let ids=href.split('entry-')[1].substring(0, 11);
+                        if(ids){
+                            let id=parseInt(ids);
+                            if(list_check(id)==0){ // idの該当なし
                                 hcal[k].classList.add('vmark'); // class「vmark」を追加
-                                list_add_mark(id); // id と mark の記録
+                                list_add(id); // id の記録
                                 fwrite(); }
                             else{
-                                hcal[k].classList.add('visit'); // class「visit」を追加
-                                list_add(id); // id の記録
-                                fwrite(); }}
-                        else{
-                            if(event.button==2){
-                                hcal[k].classList.toggle('vmark'); // class「vmark」を変更
-                                list_add_toggle(id); // markフラグの変更
-                                fwrite(); }}}}}
-
-
-            for(let k=0; k<hcal.length; k++){
-                hcal[k].oncontextmenu=(event)=>{
-                    event.preventDefault(); }}
+                                hcal[k].classList.remove('vmark'); // class「vmark」を削除
+                                list_remove(id); // id の削除
+                                fwrite(); }}}); }}
 
 
             function list_add(id){
                 ffDB.push([id, zone(0)]); }
 
-            function list_add_mark(id){
-                ffDB.push([id, zone(0), 1]); }
-
-            function list_add_toggle(id){
-                for(let k=0; k<ffDB.length; k++){
-                    if(ffDB[k][0]==id){ // id の登録内容を変更
-                        if(ffDB[k].length==3){ // mark あり
-                            ffDB[k]=[id, zone(0)]; // markフラグ削除
-                            fwrite();
-                            break; }
-                        else{ // mark なし
-                            ffDB[k]=[id, zone(0), 1]; // markフラグ追加
-                            fwrite();
-                            break; }}}}
+            function list_remove(id){
+                ffDB=ffDB.filter(function(value){
+                    return value[0]!=id; }); }
 
             function list_check(entry_id){
-                for(let k=0; k<ffDB.length; k++){
-                    if(ffDB[k][0]==entry_id){ // id 該当
-                        if(ffDB[k].length==3){ // mark あり
-                            return 2;
-                            break; }
-                        else{ // mark なし
-                            return 1;
-                            break; }}}}
+                let result=ffDB.filter(function(value){
+                    return value[0]==entry_id; });
+                if(result.length!=0){ // id 該当
+                    return 1; }
+                else{
+                    return 0; }}
 
         } // visit_control()
 
@@ -365,8 +347,7 @@ if(path=='/home'){ // HOMEページで有効
                 '<div id="ref_set"><span>更新間隔 </span>'+
                 '<input id="ref_setter" type="number" value="10" min="1" max="30" step="1">'+
                 '<span> 分　　</span></div>'+
-                '<label><input id="ff_visit" type="checkbox"> 既読マーク</label> '+
-                '<div id="visit_data"><span id="mark_count"></span>件</div>'+
+                '<label><input id="ff_visit" type="checkbox"> Memoマーク</label> '+
                 help_SVG+
 
                 '<style>#ff_panel { position: fixed; top: 8px; left: calc(50% - 532px); '+
@@ -379,28 +360,34 @@ if(path=='/home'){ // HOMEページで有効
                 'text-align: center; } '+
                 '#list_open::-webkit-inner-spin-button, #ref_setter::-webkit-inner-spin-button { '+
                 'height: 17px; } '+
-                '#ref_set, #visit_data, #mark_count { display: inline-block; } '+
-                '#mark_count { font-weight: normal; color: #000; margin: 0 6px; '+
-                'padding: 1px 6px 0; border: 1px solid #777; border-radius: 2px; } '+
+                '#ref_set { display: inline-block; } '+
                 '.ff_help { position: absolute; top: 9px; right: 12px; width: 24px; height: 24px; '+
                 'cursor: pointer; } '+
                 '.PcHeader_Logo img { outline: 1px solid #20d6c5; outline-offset: 3px; } '+
 
-                //「:visited」リンク色の補償スタイル
-                '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Meta::before { '+
-                'background-color: transparent; } '+
-                '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Unread { '+
-                'background-color: transparent; } '+
-                '.HomeChecklist_Article_Link.vmark .HomeChecklist_Article_Meta::before { '+
-                'background-color: #2196f3 !important; } '+
-                '.HomeChecklist_Article_Link.vmark .HomeChecklist_Article_Unread { '+
-                'background-color: #2196f3 !important; } '+
-                '.HomeChecklist_Article_Link.visit .HomeChecklist_Article_Title { '+
-                'color: #689cb5; } '+
-                '</style></div>';
+                //「vmark」のマーク表示
+                '.HomeChecklist_Article_Body .Author_PrimaryText { '+
+                'top: 0 !important; left: 42px !important; padding: 30px 0 0 20px; z-index: 1; } '+
+                '.HomeChecklist_Article_Link .HomeChecklist_Article_Meta::after { '+
+                'content: ""; position: absolute; top: 1px; left: -38px; '+
+                'height: 8px; width: 16px; border: 1px solid #ccc; border-radius: 3px; '+
+                'background-color: #fff; cursor: initial; } '+
+                '.HomeChecklist_Article_Link .HomeChecklist_Article_Meta:hover::after { '+
+                'top: -3px; height: 16px; } '+
+                '.HomeChecklist_Article_Link.vmark .HomeChecklist_Article_Meta::after { '+
+                'border-color: #2196f3; background-color: #2196f3; } '+
+                '</style>'+
+                //「vmark」の非表示
+                '<style class="markless">'+
+                '.HomeChecklist_Article_Link .HomeChecklist_Article_Meta::after { visibility: hidden; } '+
+                '</style>'+
+                '</div>';
 
             if(!document.querySelector('#ff_panel')){
                 document.body.insertAdjacentHTML('beforeend', panel); }
+
+
+
 
         } //ff_panel()
 
@@ -466,32 +453,32 @@ if(path=='/home'){ // HOMEページで有効
 
 
                     let ff_visit=document.querySelector('#ff_visit');
-                    let visit_data=document.querySelector('#visit_data');
-                    let mark_count=document.querySelector('#mark_count');
                     if(setting[7]==1){
                         ff_visit.checked=true;
-                        visit_data.style.opacity=1;
-                        mark_count.textContent=ffDB.length; }
+                        set_mark(1); }
                     else{
                         ff_visit.checked=false;
-                        visit_data.style.opacity=0.5;
-                        mark_count.textContent='0'; }
+                        set_mark(0); }
 
                     ff_visit.onchange=()=>{
                         if(ff_visit.checked){
                             setting[7]=1;
-                            visit_data.style.opacity=1;
+                            set_mark(1);
                             ffDB=[[0, 0]];
-                            fwrite();
-                            mark_count.textContent='0'; }
+                            fwrite(); }
                         else{
                             setting[7]=0;
-                            visit_data.style.opacity=0.5;
-                            localStorage.removeItem ('FFDB');
-                            mark_count.textContent='0'; }
+                            set_mark(0);
+                            localStorage.removeItem ('FFDB'); }
 
                         let write_json=JSON.stringify(setting);
-                        localStorage.setItem('followfeed_set', write_json); } // ストレージ保存
+                        localStorage.setItem('followfeed_set', write_json); // ストレージ保存
+
+                        let feed_button=document.querySelector('button.PcModuleHeader_Control_Link');
+                        if(feed_button){
+                            feed_button.click(); } // フィードのリロード
+
+                    } // ff_visit.onchange
 
 
                     let ff_help=document.querySelector('.ff_help');
@@ -501,6 +488,15 @@ if(path=='/home'){ // HOMEページで有効
                             window.open(url, '_blank'); }}
 
                 }}} // ff_setting()
+
+
+        function set_mark(n){
+            let markless=document.querySelector('.markless');
+            if(markless){
+                if(n==0){
+                    markless.disabled=false; }
+                else{
+                    markless.disabled=true; }}}
 
     } // set_checklist()
 
