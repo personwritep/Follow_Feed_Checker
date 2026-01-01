@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Follow Feed Checker
 // @namespace        http://tampermonkey.net/
-// @version        2.7
+// @version        2.8
 // @description        「フォローフィード」の管理補助ツール
 // @author        Ameba Blog User
 // @match        https://www.ameba.jp/home
@@ -83,7 +83,6 @@ if(path=='/home'){ // HOMEページで有効
 
 
     function set_checklist(){
-
         ff_panel();
         ff_setting();
         auto_feed();
@@ -238,9 +237,28 @@ if(path=='/home'){ // HOMEページで有効
 
 
         function mode_select(){
+            let sw=
+                '<li class="PcModuleHeader_Control n_sw">'+
+                '<p class="PcModuleHeader_Control_Link Tap_Transparent">'+
+                '<i class="Icon AmebaIcon AmebaIcon_Setting PcModuleHeader_Control_Icon"'+
+                'aria-hidden="true" role="presentation"></i>'+
+                '<span>個別設定</span></p></li>'+
+                '<style>'+
+                '.PcModuleHeader { box-shadow: none !important; }'+
+                '.PcModuleHeader_Control { padding: 0 10px; }'+
+                '.n_sw { cursor: pointer; }'+
+                '</style>';
+
+            let PMCs=document.querySelector('.PcModuleHeader_Controls');
+            if(PMCs){
+                if(!document.querySelector('.n_sw')){
+                    PMCs.insertAdjacentHTML('afterbegin', sw); }}
+
+
             let control_a=document.querySelector('.PcModuleHeader_Control a');
             control_a.onclick=function(e){
                 lock=1; } //「設定」で mode_selectを抑止
+
 
             let control_b=document.querySelector('.PcModuleHeader_Control button');
             control_b.onclick=function(e){
@@ -248,48 +266,46 @@ if(path=='/home'){ // HOMEページで有効
                 setTimeout( function(){
                     lock=0; }, 100); } //「フィードを更新」で mode_selectを抑止
 
-            let checklist=document.querySelector('.HomeChecklist');
-            let title=checklist.querySelector('.PcModuleHeader');
-            let title_label=checklist.querySelector('.PcModuleHeader_Title');
-            let title_con=checklist.querySelectorAll('.PcModuleHeader_Control_Link');
 
-            title.style.cursor='pointer';
+            let n_sw=document.querySelector('.PcModuleHeader .n_sw');
+            if(n_sw){
+                n_sw.onclick=function(){
+                    if(mode==0 && lock==0){
+                        mode=1;
+                        add_help(1);
+                        mode_style(1);
+                        checker(); }
+                    else if(mode==1 && lock==0){
+                        mode=0;
+                        add_help(0);
+                        mode_style(0);
+                        checker(); }}}
 
-            title.onclick=function(){
-                if(mode==0 && lock==0){
-                    mode=1;
-                    checklist.style.boxShadow='0 0 0 15px #6292ab inset';
-                    title.style.boxShadow='0 -4px 0 10px #6292ab, 0 0 0 20px #6292ab inset';
-                    title_label.style.color='#fff';
-                    title_con[0].style.background='#fff';
-                    title_con[1].style.background='#fff';
-                    wide_style();
-                    checker();}
-                else if(mode==1 && lock==0){
-                    mode=0;
-                    checklist.style.boxShadow='';
-                    title.style.boxShadow='';
-                    title_label.style.color='#298538';
-                    title_con[0].style.background='';
-                    title_con[1].style.background='';
-                    wide_style_off();
-                    checker(); }}
 
-            let r_column=document.querySelector('.PcLayout_RightColumn');
-            let c_style=window.getComputedStyle(r_column);
-            let c_width=c_style.getPropertyValue('width');
-            let c_item=document.querySelectorAll('.HomeChecklist_Collection_Item:nth-child(odd)');
-            function wide_style(){
-                if(c_width=='740px'){
-                    checklist.style.padding='20px';
-                    for(let k=0; k<c_item.length; k++){
-                        c_item[k].style.marginRight='24px'; }}}
+            function add_help(n){
+                let PMN=document.querySelector('.PcModuleNotification');
+                if(PMN){
+                    if(n==1){
+                        PMN.textContent=
+                            '　個別設定: フィードをクリック '+
+                            '➔ フォロー設定画面を開いて 選択したブログを検索します';
+                        PMN.style.border='1px solid red'; }
+                    else{
+                        PMN.textContent='';
+                        PMN.style.border='none'; }}}
 
-            function wide_style_off(){
-                if(c_width=='740px'){
-                    checklist.style.padding='';
-                    for(let k=0; k<c_item.length; k++){
-                        c_item[k].style.marginRight='64px'; }}}
+
+            function mode_style(n){
+                let HC=document.querySelector('.HomeChecklist');
+                if(HC){
+                    if(n==1){
+                        HC.style.outline='6px solid #2196f3';
+                        if(arranged()){
+                            HC.style.outlineOffset='-6px'; }
+                        else{
+                            HC.style.outlineOffset='10px'; }}
+                    if(n==0){
+                        HC.style.outline=''; }}}
 
         } // mode_select()
 
@@ -363,11 +379,16 @@ if(path=='/home'){ // HOMEページで有効
                 '#ref_set { display: inline-block; } '+
                 '.ff_help { position: absolute; top: 9px; right: 12px; width: 24px; height: 24px; '+
                 'cursor: pointer; } '+
-                '.PcHeader_Logo img { outline: 1px solid #20d6c5; outline-offset: 3px; } '+
+                '.PcHeader_Logo img { outline: 1px solid #20d6c5; outline-offset: 3px; } ';
 
-                //「vmark」のマーク表示
-                '.HomeChecklist_Article_Body .Author_PrimaryText { '+
-                'top: 0 !important; left: 42px !important; padding: 30px 0 0 20px; z-index: 1; } '+
+            //「vmark」のマークのマスク設定
+            if(arranged()){
+                panel+=
+                    '.HomeChecklist_Article_Body .Author_PrimaryText { '+
+                    'top: 0 !important; left: 42px !important; padding: 30px 0 0 20px; z-index: 1; } '; }
+
+            //「vmark」のマーク表示
+            panel+=
                 '.HomeChecklist_Article_Link .HomeChecklist_Article_Meta::after { '+
                 'content: ""; position: absolute; top: 1px; left: -38px; '+
                 'height: 8px; width: 16px; border: 1px solid #ccc; border-radius: 3px; '+
@@ -385,9 +406,6 @@ if(path=='/home'){ // HOMEページで有効
 
             if(!document.querySelector('#ff_panel')){
                 document.body.insertAdjacentHTML('beforeend', panel); }
-
-
-
 
         } //ff_panel()
 
@@ -498,6 +516,18 @@ if(path=='/home'){ // HOMEページで有効
                 else{
                     markless.disabled=true; }}}
 
+
+
+        function arranged(){
+            let HCCI=document.querySelector('.HomeChecklist_Collection_Item');
+            if(HCCI){
+                let item_height=window.getComputedStyle(HCCI).getPropertyValue('height');
+                if(item_height=='160px'){
+                    return false; } // フィードのアレンジなし
+                else{
+                    return true; }} // フィードのアレンジあり
+            else return false; }
+
     } // set_checklist()
 
 } // HOMEページで有効
@@ -512,6 +542,8 @@ if(path.includes('blgfavorite')){ // フォロー管理ページで有効
     let target=document.querySelector('body'); // 監視 target
     let monitor=new MutationObserver(table_view);
     monitor.observe(target, {childList: true, subtree: true}); // 監視開始
+
+    table_view();
 
     function table_view(){ // HOMEから遷移して来た最初の管理画面でのみ動作する
         let tr_href=[];
