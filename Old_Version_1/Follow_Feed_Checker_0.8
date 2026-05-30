@@ -1,0 +1,306 @@
+// ==UserScript==
+// @name         Follow Feed Checker
+// @namespace    http://tampermonkey.net/
+// @version      0.8
+// @description  「フォローフィード」の管理補助ツール
+// @author       Ameba Blog User
+// @match        https://www.ameba.jp/home
+// @match        https://blog.ameba.jp/ucs/blgfavorite/*
+// @match        https://blog.ameba.jp/reader.do?bnm*
+// @match        https://blog.ameba.jp/readerend.do*
+// @grant        none
+// ==/UserScript==
+
+
+if(document.querySelector('#AppShellDesktop')){ // HOMEページで有効
+    let mode=0;
+    let lock=0;
+    let user_id;
+
+    let target0=document.querySelector('.HomeChecklist'); // 監視 target
+    let monitor0=new MutationObserver(mode_select);
+    monitor0.observe(target0, {childList: true, subtree: true}); // 監視開始
+
+    function mode_select(){
+        window.addEventListener('scroll', ()=>{
+            let more_button=document.querySelector(
+                '.HomeChecklist_Collection + .Collection_ReadMore > button');
+            if(more_button){
+                let item=document.querySelectorAll('.HomeChecklist_Collection_Item');
+                if(item.length<20){ // ホームを開いた時の最初の記事リスト数を指定 🔴
+                    more_button.click(); }}});
+
+        let control_a=document.querySelector('.PcModuleHeader_Control a');
+        control_a.onclick=function(e){
+            lock=1; } //「設定」で mode_selectを抑止
+
+        let control_b=document.querySelector('.PcModuleHeader_Control button');
+        control_b.onclick=function(e){
+            lock=1;
+            setTimeout( function(){
+                lock=0; }, 100); } //「フィードを更新」で mode_selectを抑止
+
+        let checklist=document.querySelector('.HomeChecklist');
+        let title=document.querySelector('.HomeChecklist .PcModuleHeader');
+        let title_label=document.querySelector('.HomeChecklist .PcModuleHeader_Title');
+        let title_con=document.querySelectorAll('.PcModuleHeader_Control_Link');
+
+        title.style.cursor='pointer';
+
+        title.onclick=function(){
+            if(mode==0 && lock==0){
+                mode=1;
+                checklist.style.boxShadow='0 0 0 15px #6292ab inset';
+                title.style.boxShadow='0 -4px 0 10px #6292ab, 0 0 0 20px #6292ab inset';
+                title_label.style.color='#fff';
+                title_con[0].style.background='#fff';
+                title_con[1].style.background='#fff';
+                wide_style();
+                checker();}
+            else if(mode==1 && lock==0){
+                mode=0;
+                checklist.style.boxShadow='';
+                title.style.boxShadow='';
+                title_label.style.color='#298538';
+                title_con[0].style.background='';
+                title_con[1].style.background='';
+                wide_style_off();
+                checker(); }}
+
+        let k;
+        let r_column=document.querySelector('.PcLayout_RightColumn');
+        let c_style=window.getComputedStyle(r_column);
+        let c_width=c_style.getPropertyValue('width');
+        let c_item=document.querySelectorAll('.HomeChecklist_Collection_Item:nth-child(odd)');
+        function wide_style(){
+            if(c_width=='740px'){
+                checklist.style.padding='20px';
+                for(k=0; k<c_item.length; k++){
+                    c_item[k].style.marginRight='24px'; }}}
+
+        function wide_style_off(){
+            if(c_width=='740px'){
+                checklist.style.padding='';
+                for(k=0; k<c_item.length; k++){
+                    c_item[k].style.marginRight='64px'; }}}}
+
+
+    let target1=document.querySelector('.HomeChecklist'); // 監視 target
+    let monitor1=new MutationObserver(checker);
+    monitor1.observe(target1, {childList: true, subtree: true}); // 監視開始
+
+    function checker(){
+        let k;
+        let user_href;
+
+        let item=document.querySelectorAll('.HomeChecklist_Collection_Item');
+        for(k=0; k<item.length; k++){
+            select_item(k); }
+
+        function select_item(n){
+            if(mode==1){
+                item[n].onclick=function(e){
+                    e.preventDefault();
+                    user_href=item[n].querySelector('.HomeChecklist_Article_Link').getAttribute('href');
+                    user_id=user_href.replace('https://ameblo.jp/', '');
+                    let index=user_id.indexOf('/entry');
+                    user_id=user_id.substring(0, index);
+                    item[n].style.outline='2px solid red';
+                    setTimeout( conf, 800);
+
+                    function conf(){
+                        item[n].style.outline='';
+                        let url_str='https://blog.ameba.jp/ucs/blgfavorite/favoritelist.do?' + user_id;
+                        window.open( url_str, '_blank'); }}} // ページ移動
+            else if(mode==0){
+                item[n].onclick=function(e){ ; }}}}
+
+
+    let repeat=null;
+    auto_feed();
+
+    function feed(){
+        let control_b=document.querySelector('.PcModuleHeader_Control button');
+        if(control_b){
+            control_b.click(); }}
+
+    function auto_feed(){
+        feed();
+        repeat=setTimeout(auto_feed, 600000); } // フィードの自動更新間隔（msec）🔴
+
+    window.addEventListener('focus', function(){
+        auto_feed(); });
+
+    window.addEventListener('blur', function(){
+        clearTimeout(repeat); });
+
+} // HOMEページで有効
+
+
+if(document.querySelector('#readerList')){ // フォロー管理ページで有効
+    let user_id;
+    let win_url;
+
+    let target2=document.querySelector('body'); // 監視 target
+    let monitor2=new MutationObserver(table_view);
+    monitor2.observe(target2, {childList: true, subtree: true}); // 監視開始
+
+    function table_view(){ // HOMEから遷移して来た最初の管理画面でのみ動作する
+        let k;
+        let tr_href=[];
+        let find=0;
+
+        win_url=window.location.search.substring(1,window.location.search.length);
+
+        if(win_url !='' && win_url.indexOf('pageID') ==-1){ // URLにuser_idが有る場合
+            user_id=win_url;
+            let write_json=JSON.stringify(user_id);
+            localStorage.setItem('followfeedcheck_id', write_json); // ローカルストレージ名
+
+            let table_tr=document.querySelectorAll('.tableList tbody tr');
+            for(k=0; k<table_tr.length; k++){
+                tr_href[k]=table_tr[k].querySelector('td.title a').getAttribute('href');
+                if(tr_href[k].indexOf(user_id) !=-1){
+                    find=1;
+                    table_tr[k].style.outline='2px solid red';
+                    table_tr[k].scrollIntoView({block: 'center'});
+                    status();
+                    return; }} // 検索処理を終了
+
+            if(find==0){ // user_idが見つからないと2ページへ移動
+                let pager=document.querySelector('.pagingArea');
+                let end=document.querySelector('.pagingArea .disabled.next');
+                if(!end && pager){ // ページング末尾で無ければ2ページへ
+                    let url_str='https://blog.ameba.jp/ucs/blgfavorite/favoritelist.do?pageID=2&More';
+                    window.open( url_str, '_self'); }}} // URLにuser_idが有る場合
+        else{ //  HOMEからの遷移ではなく、単独でフォロー管理を開いた場合
+            status(); }}
+
+
+    let target3=document.querySelector('body'); // 監視 target
+    let monitor3=new MutationObserver(table_view_next);
+    monitor3.observe(target3, {childList: true, subtree: true}); // 監視開始
+
+    function table_view_next(){ // 管理画面のリスト2ページ目以降から動作する
+        let k;
+        let tr_href=[];
+        let find=0;
+
+        win_url=window.location.search.substring(1,window.location.search.length);
+        if(win_url.indexOf('&More') !=-1){ // URLに&Moreが有る場合のみ
+
+            let read_json=localStorage.getItem('followfeedcheck_id'); // &Moreページで再読込み
+            if(JSON.parse(read_json)){
+                user_id=JSON.parse(read_json); }
+
+            let table_tr=document.querySelectorAll('.tableList tbody tr');
+            for(k=0; k<table_tr.length; k++){
+                tr_href[k]=table_tr[k].querySelector('td.title a').getAttribute('href');
+                if(tr_href[k].indexOf(user_id) !=-1){
+                    find=1;
+                    table_tr[k].style.outline='2px solid red';
+                    table_tr[k].scrollIntoView({block: 'center'});
+                    status(); // 非公開への自動変更機能の待機
+                    return; }} // 検索処理を終了
+
+            if(find==0){ // user_idが見つからないと次ページへ移動
+                let end=document.querySelector('.pagingArea .disabled.next');
+                if(!end){ // ページング末尾で無ければ次ページへ
+                    let page_n=win_url.replace(/[^0-9]/g, '');
+                    page_n=parseInt(page_n, 10) +1;
+                    let url_str=['https://blog.ameba.jp/ucs/blgfavorite/favoritelist.do?pageID=',
+                                 + page_n + '&More'].join('');
+                    window.open( url_str, '_self'); }}}}
+
+
+    function status(){ //「公開フォロー」を「非公開」に変更
+        let k;
+        let blog_id=[];
+        let status_span=[];
+        let del_button=[];
+        let blog_name=document.querySelectorAll('input[name="blog_name"]');
+        let table_tr=document.querySelectorAll('.tableList tbody tr');
+
+        let info=document.createElement('div');
+        info.textContent="「承認済み」ボタンをクリックすると"+
+            "「公開フォロー」を「非公開フォロー」に自動的に変更します";
+        info.style.margin='6px 0 -12px';
+        info.style.padding='2px 6px 1px';
+        info.style.color='#fff';
+        info.style.background='#2196f3';
+        let box=document.querySelector('#ucsMainLeft #notes');
+        if(!box.querySelector('div')){
+            box.appendChild(info); }
+
+        for(k=0; k<table_tr.length; k++){
+            blog_id[k]=blog_name[k].getAttribute('value');
+            del_button[k]=table_tr[k].querySelector('.btnDelete');
+            status_span[k]=table_tr[k].querySelector('.status span');
+            if(status_span[k].classList.contains('open')==true){
+                status_span[k].style.borderRadius='3px';
+                status_span[k].style.boxShadow='0 0 0 2px #2196f3';
+                status_span[k].style.cursor='pointer';
+                win_open(status_span[k], blog_id[k], del_button[k]); }}
+
+
+        function win_open(span, id, del){ // 公開→非公開の自動変更
+            span.onclick=function(){
+                del.click();
+                setTimeout(()=>{ // 対象ブログの削除ボタンを押す
+                    let ok=document.querySelector('.minimumApplyButton a:first-child');
+                    ok.click();
+                }, 20);
+                setTimeout(()=>{ // 対象ブログを非公開フォローする
+                    let follow_url='https://blog.ameba.jp/reader.do?bnm=' + id + '&status=close';
+                    window.open( follow_url, '_blank', 'top=0, left=0, width=480, height=360');
+                }, 500); }}} // 処理を待ってから次のステップを実行
+
+} // フォロー管理ページで有効
+
+
+if(document.querySelector('#header.rd-header')){ // フォロー登録画面で有効
+    let css=[
+        'body { font-family: Meiryo; background: #cfd8dc; }',
+        '#ambHeader { min-width: 400px !important; }',
+        '#header.rd-header { display: flex; justify-content: center; width: auto; ',
+        'padding: 20px 0 14px !important; }',
+        '#contentsArea.rd-contentsArea { width: 400px !important; margin: 0 auto; }',
+        '#mainCol.rd-mainCol { padding-top: 40px; }',
+        '#contentsArea.rd-contentsArea._end { width: 400px; margin: 0 auto; }',
+        '.rd-contentsArea._end #mainCol.rd-mainCol { padding: 20px 0 0; }',
+        '.rd-checkList { margin: 15px 0; } .rd-error .error { font-size: 18px; font-weight: bold; }',
+        '.rd-selectArea { width: 394px; } .rd-regist { padding: 15px; }',
+        '.rd-radioArea { margin: 0; } .rd-radioLabel { font-size: 16px; }',
+        '.rd-radioLabel:before { left: -23px; width: 14px; height: 14px; margin-top: -8px; }',
+        '.rd-radioLabel:after { left: -24px; width: 14px; height: 14px; margin-top: -9px; ',
+        'border: 1px solid #88bae6; }',
+        '#ambHeaderRight, #ambFooter { display: none; }',
+        '.rd-explanationSmall, .rd-amemberArea, .rd-browserPushArea, .rd-monsterBnr, ',
+        '.rd-explanation, .rd-explanationSub, .rd-radioExplanation, .rd-infoMail, ',
+        '.rd-followManagementLink { display: none; }' ].join(' ');
+
+    let style=document.createElement('style');
+    style.insertAdjacentHTML('afterbegin', css);
+    let head=document.getElementsByTagName('head')[0];
+    head.appendChild(style);
+
+    let target4=document.querySelector('body'); // 監視 target
+    let monitor4=new MutationObserver(ffcheker_do);
+    monitor4.observe(target4, {childList: true, subtree: true}); // 監視開始
+
+    function ffcheker_do(){
+        let win_url=window.location.search.substring(1,window.location.search.length);
+        if(win_url.indexOf('status=close')!=-1){
+            if(!document.querySelector('.rd-error._whole .error')){ // 既にフォローしていない事が条件
+                setTimeout(()=>{ // 非公開でフォローするにチェックを入れる
+                    document.querySelector('#secInValidateNumber_01').checked=true;
+                }, 20);
+                setTimeout(()=>{ //「フォロー」決定ボタンを押す
+                    document.querySelector('.rd-btnSubmit').click();
+                }, 40);
+                setTimeout(()=>{ // フォロー管理のトップを開く
+                    let top_href='https://blog.ameba.jp/ucs/blgfavorite/favoritelist.do';
+                    window.opener.location.href=top_href;
+                }, 500); }}} // 処理の結果をフォロー管理画面に反映
+
+} // フォロー登録画面で有効
